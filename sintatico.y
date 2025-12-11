@@ -67,7 +67,7 @@ Ast *newast(int nodetype, Ast *l, Ast *r);
 Ast *newnum(double d);
 Ast *newvar(char *s);
 Ast *newcmp(int cmptype, Ast *l, Ast *r);
-Ast *newflow(int nodetype, Ast *cond, Ast *tl, Ast *el); /* NOVO  */
+Ast *newflow(int nodetype, Ast *cond, Ast *tl, Ast *el);
 double eval(Ast *a);
 
 %}
@@ -96,7 +96,7 @@ double eval(Ast *a);
 %nonassoc IFX
 %nonassoc SENAO
 
-%left CMP %left CMP /* Menor precedência: compara depois de somar. Igual a C, Python e Java */
+%left CMP /* Menor precedência: compara depois de somar. Igual a C, Python e Java */
 %left MAIS MENOS
 %left VEZES DIV
 
@@ -115,13 +115,14 @@ comandos:
     | comandos comando { 
         if ($1 != NULL)
             $$ = newast('L', $1, $2);
-        else    
+        else
             $$ = $2;
     }
     ;
-    
+
 comando:
     ESCREVA ABRE_P expressao FECHA_P PTVIRG { $$ = newast('P', $3, NULL); }
+    | LEIA ABRE_P VAR FECHA_P PTVIRG { $$ = newast('R', newvar($3), NULL); }
     | declaracao { $$ = $1; }
     | atribuicao { $$ = $1; }
     | fluxo { $$ = $1; }
@@ -199,6 +200,7 @@ Ast *newcmp(int cmptype, Ast *l, Ast *r) {
 
     /* Para não colidir com letras ASCII, somamos o tipo com '0'. Ex: Se cmptype for 1 (>), nodetype vira '1' */
     /*Para pegar o tipe de teste, definido no arquivo.l e utilizar na função eval()*/
+    
     a->nodetype = '0' + cmptype; 
     a->l = l;
     a->r = r;
@@ -236,11 +238,24 @@ double eval(Ast *a) {
             v = 0;
             break;
 
+        case 'R': /* LEIA */
+            aux = srch(l1, ((Varval *)a->l)->var);
+            if(aux) {
+                printf("Digite valor para %s: ", aux->name);
+                fflush(stdout); /* Garante que a mensagem apareça antes de travar no scanf */
+                if(scanf("%lf", &v) == 1) {
+                    aux->valor = v;
+                }
+            } else {
+                printf("Erro: Variavel nao declarada.\n");
+            }
+            break;
+
         case '=': 
             v = eval(a->r);
             aux = srch(l1, ((Varval *)a->l)->var);
             if(aux) aux->valor = v;
-            else printf("Erro: Tentando atribuir a variavel nao declarada.\n");
+            else printf("Erro: Variavel nao declarada.\n");
             break;
 
         case '+': v = eval(a->l) + eval(a->r); break;
@@ -249,6 +264,7 @@ double eval(Ast *a) {
         case '/': v = eval(a->l) / eval(a->r); break;
         
         /* Lógica de Comparação. "árv esq   >   árv dir" (Retorna 1.0 se True, 0.0 se False) */
+        
         case '1': v = (eval(a->l) > eval(a->r)) ? 1 : 0; break;
         case '2': v = (eval(a->l) < eval(a->r)) ? 1 : 0; break;
         case '3': v = (eval(a->l) != eval(a->r)) ? 1 : 0; break;
@@ -259,15 +275,9 @@ double eval(Ast *a) {
         /* Lógica do IF/ELSE*/
         case 'I':
             if (eval(((Flow *)a)->cond) != 0) { /* se condicao verdadeira */
-                if (((Flow *)a)->tl)
-                    v = eval(((Flow *)a)->tl);
-                else
-                    v = 0.0;
+                if (((Flow *)a)->tl) v = eval(((Flow *)a)->tl); else v = 0.0;
             } else {
-                if (((Flow *)a)->el) {
-                    v = eval(((Flow *)a)->el);
-                } else
-                    v = 0.0;
+                if (((Flow *)a)->el) v = eval(((Flow *)a)->el); else v = 0.0;
             }
             break;
 
@@ -281,10 +291,7 @@ double eval(Ast *a) {
             }
             break;
 
-        case 'L': 
-            eval(a->l); 
-            v = eval(a->r); 
-            break;
+        case 'L': eval(a->l); v = eval(a->r); break;
 
         case 'P': 
             v = eval(a->l);
@@ -305,7 +312,16 @@ void yyerror(const char *s) {
     fprintf(stderr, "Erro sintatico: %s\n", s);
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    if (argc > 1) {
+        FILE *arquivo = fopen(argv[1], "r");
+        if (!arquivo) {
+            printf("Erro ao abrir arquivo.\n");
+            return 1;
+        }
+        yyin = arquivo;
+    }
     yyparse();
+    if (argc > 1) fclose(yyin);
     return 0;
 }

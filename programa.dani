@@ -19,3 +19,11 @@ se (i == 5) {
 } senao {
     escreva(0);
 }
+
+escreva(000);  
+leia(x);
+se (x > 10) {
+    escreva(1);
+} senao {
+    escreva(0);
+}

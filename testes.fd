@@ -1,0 +1,43 @@
+int x;
+x = 10 + 5;
+escreva(x);
+
+x = 10;
+escreva(x > 5);   
+escreva(x == 5);
+
+int i;
+i = 0;
+
+enquanto (i < 5) {
+    i = i + 1;
+    escreva(i);
+}
+
+se (i == 5) {
+    escreva(100);
+} senao {
+    escreva(0);
+}
+
+escreva(000);  
+leia(x);
+se (x > 10) {
+    escreva(1);
+} senao {
+    escreva(0);
+}
+
+string s;
+s = "Teste de Texto";
+escreva(s);
+
+int n;
+escreva("Digite um numero:");
+leia(n);
+
+se (n > 10) {
+    escreva("Maior que 10");
+} senao {
+    escreva("Menor ou igual a 10");
+}

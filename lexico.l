@@ -51,7 +51,14 @@ COMENTARIO   "//".*
 
 {FLOAT}         { yylval.flo = atof(yytext); return NUM_FLOAT; }
 {DIGITO}+       { yylval.flo = atof(yytext); return NUM_INT; }
-{STRING}        { return LITERAL_STR; }
+
+{STRING}        { 
+                  /* Remove as aspas para salvar apenas o texto */
+                  yytext[yyleng-1] = 0; 
+                  strcpy(yylval.str, yytext+1); 
+                  return LITERAL_STR; 
+                }
+
 {VARIAVEL}      { strcpy(yylval.str, yytext); return VAR; }
 
 .               { printf("Erro lexico: %s\n", yytext); } 

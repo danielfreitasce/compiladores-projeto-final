@@ -1,0 +1,19 @@
+// Calculo de Fatorial Iterativo
+int n;
+int fat;
+int i;
+
+escreva("Digite um numero inteiro:");
+leia(n);
+
+fat = 1;
+i = 1;
+
+// Loop para multiplicar: 1 * 2 * 3 * ... * n
+enquanto (i <= n) {
+    fat = fat * i;
+    i = i + 1;
+}
+
+escreva("O Fatorial e:");
+escreva(fat);

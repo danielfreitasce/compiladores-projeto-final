@@ -7,11 +7,16 @@
 int yylex();
 void yyerror(const char *s);
 
-/* --- ESTRUTURAS DA AST --- */
+/* ========================================================================== */
+/* ESTRUTURAS DE DADOS (CABEÇALHO)                      */
+/* ========================================================================== */
 
+/* 1. Tabela de Símbolos (Lista Encadeada) */
 typedef struct vars {
     char name[50];
-    double valor;
+    int type;       /* 0=NUMERO, 1=STRING */
+    double valor;   /* Valor se for numero */
+    char str[100];  /* Valor se for string */
     struct vars *prox;
 } VARI;
 
@@ -22,6 +27,8 @@ VARI *ins(VARI *l, char n[]) {
     VARI *new = (VARI*)malloc(sizeof(VARI));
     strcpy(new->name, n);
     new->valor = 0;
+    new->type = 0;
+    new->str[0] = '\0';
     new->prox = l;
     return new;
 }
@@ -37,45 +44,67 @@ VARI *srch(VARI *l, char n[]) {
     return NULL; 
 }
 
-/* Estruturas da Árvore (AST) */
-typedef struct ast { /* Nó genérico para operadores (+, -, *) */
+/* 2. Estruturas da Árvore (AST) */
+
+/* Nó genérico (Operadores) */
+typedef struct ast {
     int nodetype;
     struct ast *l;
     struct ast *r;
 } Ast;
 
-typedef struct numval { /* Nó para números */
+/* Nó Numérico */
+typedef struct numval {
     int nodetype;
     double number;
 } Numval;
 
-typedef struct varval { /* Nó para variáveis */
+/* Nó String */
+typedef struct strval {
+    int nodetype;
+    char str[100];
+} Strval;
+
+/* Nó Variável */
+typedef struct varval {
     int nodetype;
     char var[50];
 } Varval;
 
-/* IF/ELSE/WHILE  */
+/* Nó de Fluxo (IF/WHILE) */
 typedef struct flow {
-    int nodetype;     /* Tipo I (if) ou W (while) */
-    Ast *cond;        /* Condição */
-    Ast *tl;          /* Then list (Bloco Verdadeiro) */
-    Ast *el;          /* Else list (Bloco Falso) */
+    int nodetype;
+    Ast *cond;
+    Ast *tl;
+    Ast *el;
 } Flow;
 
-/* Protótipos */
+/* Estrutura de Retorno do EVAL (Para suportar Num e String) */
+typedef struct {
+    int type; /* 0=NUM, 1=STR */
+    double val;
+    char str[100];
+} Data;
+
+/* Protótipos das Funções Auxiliares */
 Ast *newast(int nodetype, Ast *l, Ast *r);
 Ast *newnum(double d);
+Ast *newstr(char *s); /* NOVO */
 Ast *newvar(char *s);
 Ast *newcmp(int cmptype, Ast *l, Ast *r);
 Ast *newflow(int nodetype, Ast *cond, Ast *tl, Ast *el);
-double eval(Ast *a);
+Data eval(Ast *a);
 
 %}
+
+/* ========================================================================== */
+/* DEFINIÇÕES DO BISON                                 */
+/* ========================================================================== */
 
 %union {
     double flo;
     int fn;
-    char str[50];
+    char str[100];
     Ast *a;
 }
 
@@ -85,14 +114,12 @@ double eval(Ast *a);
 %token SE SENAO ENQUANTO PARA
 %token PTVIRG VIRGULA
 %token ABRE_P FECHA_P ABRE_C FECHA_C
-%token LITERAL_STR ATRIB
+%token ATRIB
 
-/* Tokens com valor */
 %token <flo> NUM_INT NUM_FLOAT
-%token <str> VAR
+%token <str> VAR LITERAL_STR
 %token <fn> CMP
 
-/* Precedência para resolver o "Dangling Else" (conflito do Se/Senao) */
 %nonassoc IFX
 %nonassoc SENAO
 
@@ -104,9 +131,11 @@ double eval(Ast *a);
 
 %%
 
-/* --- GRAMÁTICA --- */
+/* ========================================================================== */
+/* GRAMÁTICA (REGRAS)                               */
+/* ========================================================================== */
 
-inicio:
+inicio: 
     comandos { eval($1); }
     ;
 
@@ -156,6 +185,7 @@ fluxo:
 expressao:
     NUM_INT             { $$ = newnum($1); }
     | NUM_FLOAT         { $$ = newnum($1); }
+    | LITERAL_STR       { $$ = newstr($1); }
     | VAR               { $$ = newvar($1); }
     | expressao MAIS expressao  { $$ = newast('+', $1, $3); }
     | expressao MENOS expressao { $$ = newast('-', $1, $3); }
@@ -167,7 +197,9 @@ expressao:
 
 %%
 
-/* --- FUNÇÕES AUXILIARES --- */
+/* ========================================================================== */
+/* FUNÇÕES AUXILIARES E MAIN                            */
+/* ========================================================================== */
 
 Ast *newast(int nodetype, Ast *l, Ast *r) {
     Ast *a = (Ast*) malloc(sizeof(Ast));
@@ -183,6 +215,14 @@ Ast *newnum(double d) {
     if(!a) { printf("Sem memoria"); exit(0); }
     a->nodetype = 'K'; 
     a->number = d;
+    return (Ast*)a;
+}
+
+Ast *newstr(char *s) {
+    Strval *a = (Strval*) malloc(sizeof(Strval));
+    if(!a) { printf("Sem memoria"); exit(0); }
+    a->nodetype = 'S'; 
+    strcpy(a->str, s);
     return (Ast*)a;
 }
 
@@ -218,89 +258,117 @@ Ast *newflow(int nodetype, Ast *cond, Ast *tl, Ast *el) {
     return (Ast *)a;
 }
 
-double eval(Ast *a) {
-    double v;
+/* INTERPRETADOR (EVAL) */
+Data eval(Ast *a) {
+    Data v = {0, 0, ""}; 
+    Data v1, v2;
     VARI *aux;
 
-    if(!a) return 0.0;
+    if(!a) return v;
 
     switch(a->nodetype) {
-        case 'K': v = ((Numval *)a)->number; break;
-
-        case 'N': 
-            aux = srch(l1, ((Varval *)a)->var);
-            if(aux) v = aux->valor;
-            else { printf("Erro: Variavel '%s' nao declarada.\n", ((Varval *)a)->var); v = 0; }
+        case 'K': /* Numero */
+            v.type = 0;
+            v.val = ((Numval *)a)->number; 
             break;
 
-        case 'D': 
+        case 'S': /* String */
+            v.type = 1;
+            strcpy(v.str, ((Strval *)a)->str);
+            break;
+
+        case 'N': /* Variavel */
+            aux = srch(l1, ((Varval *)a)->var);
+            if(aux) {
+                v.type = aux->type;
+                if(v.type == 0) v.val = aux->valor;
+                else strcpy(v.str, aux->str);
+            } else { 
+                printf("Erro: Variavel '%s' nao declarada.\n", ((Varval *)a)->var); 
+            }
+            break;
+
+        case 'D': /* Declaracao */
             l1 = ins(l1, ((Varval *)a->l)->var);
-            v = 0;
             break;
 
         case 'R': /* LEIA */
             aux = srch(l1, ((Varval *)a->l)->var);
             if(aux) {
                 printf("Digite valor para %s: ", aux->name);
-                fflush(stdout); /* Garante que a mensagem apareça antes de travar no scanf */
-                if(scanf("%lf", &v) == 1) {
-                    aux->valor = v;
+                fflush(stdout);
+                if(scanf("%lf", &v.val) == 1) {
+                    aux->type = 0;
+                    aux->valor = v.val;
                 }
             } else {
                 printf("Erro: Variavel nao declarada.\n");
             }
             break;
 
-        case '=': 
+        case '=': /* Atribuicao */
             v = eval(a->r);
             aux = srch(l1, ((Varval *)a->l)->var);
-            if(aux) aux->valor = v;
-            else printf("Erro: Variavel nao declarada.\n");
-            break;
-
-        case '+': v = eval(a->l) + eval(a->r); break;
-        case '-': v = eval(a->l) - eval(a->r); break;
-        case '*': v = eval(a->l) * eval(a->r); break;
-        case '/': v = eval(a->l) / eval(a->r); break;
-        
-        /* Lógica de Comparação. "árv esq   >   árv dir" (Retorna 1.0 se True, 0.0 se False) */
-        
-        case '1': v = (eval(a->l) > eval(a->r)) ? 1 : 0; break;
-        case '2': v = (eval(a->l) < eval(a->r)) ? 1 : 0; break;
-        case '3': v = (eval(a->l) != eval(a->r)) ? 1 : 0; break;
-        case '4': v = (eval(a->l) == eval(a->r)) ? 1 : 0; break;
-        case '5': v = (eval(a->l) >= eval(a->r)) ? 1 : 0; break;
-        case '6': v = (eval(a->l) <= eval(a->r)) ? 1 : 0; break;
-
-        /* Lógica do IF/ELSE*/
-        case 'I':
-            if (eval(((Flow *)a)->cond) != 0) { /* se condicao verdadeira */
-                if (((Flow *)a)->tl) v = eval(((Flow *)a)->tl); else v = 0.0;
+            if(aux) {
+                aux->type = v.type;
+                if(v.type == 0) aux->valor = v.val;
+                else strcpy(aux->str, v.str);
             } else {
-                if (((Flow *)a)->el) v = eval(((Flow *)a)->el); else v = 0.0;
+                printf("Erro: Variavel nao declarada.\n");
             }
             break;
 
-        /* Lógica do WHILE */
+        /* Operacoes Matematicas (Simplificadas para numeros) */
+        case '+': v1 = eval(a->l); v2 = eval(a->r); v.val = v1.val + v2.val; break;
+        case '-': v1 = eval(a->l); v2 = eval(a->r); v.val = v1.val - v2.val; break;
+        case '*': v1 = eval(a->l); v2 = eval(a->r); v.val = v1.val * v2.val; break;
+        case '/': v1 = eval(a->l); v2 = eval(a->r); v.val = v1.val / v2.val; break;
+        
+        /* Comparacoes */
+         /* Lógica de Comparação. "árv esq   >   árv dir" (Retorna 1.0 se True, 0.0 se False) */
+        case '1': v1 = eval(a->l); v2 = eval(a->r); v.val = (v1.val > v2.val) ? 1 : 0; break;
+        case '2': v1 = eval(a->l); v2 = eval(a->r); v.val = (v1.val < v2.val) ? 1 : 0; break;
+        case '3': v1 = eval(a->l); v2 = eval(a->r); v.val = (v1.val != v2.val) ? 1 : 0; break;
+        case '4': v1 = eval(a->l); v2 = eval(a->r); 
+                  if(v1.type==1 && v2.type==1) v.val = (strcmp(v1.str, v2.str) == 0);
+                  else v.val = (v1.val == v2.val);
+                  break;
+        case '5': v1 = eval(a->l); v2 = eval(a->r); v.val = (v1.val >= v2.val) ? 1 : 0; break;
+        case '6': v1 = eval(a->l); v2 = eval(a->r); v.val = (v1.val <= v2.val) ? 1 : 0; break;
+
+        /* IF / ELSE */
+        case 'I':
+            if (eval(((Flow *)a)->cond).val != 0) { 
+                if (((Flow *)a)->tl) v = eval(((Flow *)a)->tl);
+            } else {
+                if (((Flow *)a)->el) v = eval(((Flow *)a)->el);
+            }
+            break;
+
+        /* WHILE */
         case 'W':
-            v = 0.0;
             if (((Flow *)a)->tl) {
-                while (eval(((Flow *)a)->cond) != 0) {
+                while (eval(((Flow *)a)->cond).val != 0) {
                     v = eval(((Flow *)a)->tl);
                 }
             }
             break;
 
-        case 'L': eval(a->l); v = eval(a->r); break;
+        /* Lista de Comandos */
+        case 'L': 
+            eval(a->l); 
+            v = eval(a->r); 
+            break;
 
+        /* ESCREVA */
         case 'P': 
             v = eval(a->l);
-            printf("%.2f\n", v);
+            if(v.type == 0) printf("%.2f\n", v.val);
+            else printf("%s\n", v.str);
             break;
 
         default: 
             printf("Erro interno: no desconhecido %c\n", a->nodetype);
-            v = 0;
             break;
     }
     return v;

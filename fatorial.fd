@@ -1,19 +1,24 @@
-// Calculo de Fatorial Iterativo
+/*  
+   Calcula Fatorial 
+*/
+
 int n;
 int fat;
 int i;
 
-escreva("Digite um numero inteiro:");
-leia(n);
+escreva("Digite um numero (Fatorial):");
+leia(n); // Lê o número
 
 fat = 1;
 i = 1;
 
-// Loop para multiplicar: 1 * 2 * 3 * ... * n
+/* Bloco de repeticao
+   Multiplica fat * i ate chegar em n
+*/
 enquanto (i <= n) {
     fat = fat * i;
     i = i + 1;
 }
 
-escreva("O Fatorial e:");
+escreva("Resultado:");
 escreva(fat);

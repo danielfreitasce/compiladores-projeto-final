@@ -89,7 +89,7 @@ typedef struct {
 /* Protótipos das Funções Auxiliares */
 Ast *newast(int nodetype, Ast *l, Ast *r);
 Ast *newnum(double d);
-Ast *newstr(char *s); /* NOVO */
+Ast *newstr(char *s);
 Ast *newvar(char *s);
 Ast *newcmp(int cmptype, Ast *l, Ast *r);
 Ast *newflow(int nodetype, Ast *cond, Ast *tl, Ast *el);
@@ -123,7 +123,7 @@ Data eval(Ast *a);
 %nonassoc IFX
 %nonassoc SENAO
 
-%left CMP /* Menor precedência: compara depois de somar. Igual a C, Python e Java */
+%left CMP /* Menor precedência: compara depois de somar. Igual ao C, Python e Java */
 %left MAIS MENOS
 %left VEZES DIV
 
@@ -295,7 +295,7 @@ Data eval(Ast *a) {
         case 'R': /* LEIA */
             aux = srch(l1, ((Varval *)a->l)->var);
             if(aux) {
-                printf("Digite valor para %s: ", aux->name);
+                //printf("Digite valor para %s: ", aux->name);
                 fflush(stdout);
                 if(scanf("%lf", &v.val) == 1) {
                     aux->type = 0;

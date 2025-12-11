@@ -8,16 +8,18 @@ DIGITO   [0-9]
 LETRA    [a-zA-Z]
 ESPACO   [ \t]
 QUEBRA   [\n]
-VARIAVEL {LETRA}({LETRA}|{DIGITO})*
+VARIAVEL {LETRA}({LETRA}|{DIGITO}|_)*
 FLOAT    {DIGITO}+\.{DIGITO}+
 STRING   \"[^\"]*\"
 COMENTARIO   "//".*
+COMENTARIO_BLOCO   "/*"([^*]|(\*+[^*/]))*"*/"
 
 %%
 
 {ESPACO}+       { /* Ignora espaços */ }
 {QUEBRA}        { /* Ignora quebras de linha */ }
 {COMENTARIO}    { /* Ignora comentários */ }
+{COMENTARIO_BLOCO}  { /* Ignora comentário de bloco p. 60 */ }
 
 "programa"      { return PROGRAMA; }
 "int"           { return TYPE_INT; }

@@ -1,0 +1,84 @@
+/* ============================================================================
+ ENUNCIADO DO PROBLEMA:
+ 
+ O Índice de Rendimento Acadêmico (IRA) é um valor quantitativo utilizado 
+ para medir o desempenho acumulado pelo estudante. 
+ 
+ O cálculo é feito através de uma média ponderada das notas de cada 
+ componente curricular, levando-se em consideração a quantidade de 
+ créditos.
+ 
+ Fórmula:
+ IRA = Somatorio (Mf * Cr) / Somatorio (Cr)
+ 
+ Onde:
+ - Mf = Média final do componente curricular
+ - Cr = Créditos do componente curricular
+ ============================================================================
+*/
+
+escreva("--- CALCULO DE IRA (IFCE) ---");
+
+// --- 1. Declaracao de Variaveis ---
+int total_disciplinas;
+int contador;
+
+float nota_atual;      // Mf
+float credito_atual;   // Cr
+
+float soma_ponderada;  // Numerador da formula: (Mf1*Cr1) + (Mf2*Cr2)...
+float soma_creditos;   // Denominador da formula: Cr1 + Cr2...
+float ira_final;
+
+// --- 2. Inicializacao ---
+soma_ponderada = 0;
+soma_creditos = 0;
+contador = 0;
+
+// --- 3. Entrada de Dados Inicial ---
+escreva("Quantas disciplinas voce cursou?");
+leia(total_disciplinas);
+
+// --- 4. Processamento (Loop) ---
+// Como nao temos arrays, calculamos o somatorio passo a passo
+enquanto (contador < total_disciplinas) {
+    escreva("--------------------------------");
+    
+    // Leitura da Nota (Mf)
+    escreva("Digite a Media Final (Mf):");
+    leia(nota_atual);
+    
+    // Leitura dos Creditos (Cr)
+    escreva("Digite os Creditos (Cr) para disciplina :"); 
+    leia(credito_atual);
+    
+    // Acumulando para a formula:
+    // Numerador += Nota * Credito
+    soma_ponderada = soma_ponderada + (nota_atual * credito_atual);
+    
+    // Denominador += Credito
+    soma_creditos = soma_creditos + credito_atual;
+    
+    contador = contador + 1;
+}
+
+escreva("--------------------------------");
+
+// --- 5. Calculo Final e Saida ---
+se (soma_creditos > 0) {
+    ira_final = soma_ponderada / soma_creditos;
+    
+    escreva("Soma das Notas Ponderadas:");
+    escreva(soma_ponderada);
+    
+    escreva("Total de Creditos:");
+    escreva(soma_creditos);
+    
+    escreva("=================");
+    escreva("SEU IRA FINAL E:");
+    escreva(ira_final);
+    escreva("=================");
+    
+} senao {
+    escreva("Erro: O total de creditos e zero. Impossivel calcular.");
+}

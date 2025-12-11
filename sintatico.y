@@ -9,7 +9,6 @@ void yyerror(const char *s);
 
 /* --- ESTRUTURAS DA AST --- */
 
-/* Tabela de Símbolos */
 typedef struct vars {
     char name[50];
     double valor;
@@ -38,7 +37,7 @@ VARI *srch(VARI *l, char n[]) {
     return NULL; 
 }
 
-/* 2. Estruturas da Árvore (AST) */
+/* Estruturas da Árvore (AST) */
 typedef struct ast { /* Nó genérico para operadores (+, -, *) */
     int nodetype;
     struct ast *l;
@@ -55,24 +54,31 @@ typedef struct varval { /* Nó para variáveis */
     char var[50];
 } Varval;
 
+/* IF/ELSE/WHILE  */
+typedef struct flow {
+    int nodetype;     /* Tipo I (if) ou W (while) */
+    Ast *cond;        /* Condição */
+    Ast *tl;          /* Then list (Bloco Verdadeiro) */
+    Ast *el;          /* Else list (Bloco Falso) */
+} Flow;
+
 /* Protótipos */
 Ast *newast(int nodetype, Ast *l, Ast *r);
 Ast *newnum(double d);
 Ast *newvar(char *s);
 Ast *newcmp(int cmptype, Ast *l, Ast *r);
+Ast *newflow(int nodetype, Ast *cond, Ast *tl, Ast *el); /* NOVO  */
 double eval(Ast *a);
 
 %}
 
-/* --- UNION (Tipos de dados que transitam) --- */
 %union {
     double flo;
-    int fn;       /* NOVO: Para guardar o código da comparação (1, 2, 3...) */
+    int fn;
     char str[50];
     Ast *a;
 }
 
-/* --- TOKENS --- */
 %token PROGRAMA
 %token TYPE_INT TYPE_FLOAT TYPE_STRING
 %token ESCREVA LEIA
@@ -84,21 +90,24 @@ double eval(Ast *a);
 /* Tokens com valor */
 %token <flo> NUM_INT NUM_FLOAT
 %token <str> VAR
-%token <fn> CMP  /*Token de comparação que carrega um inteiro */
+%token <fn> CMP
 
-/* Precedência */
-%left CMP           /* Menor precedência: compara depois de somar. Igual a C, Python e Java */
+/* Precedência para resolver o "Dangling Else" (conflito do Se/Senao) */
+%nonassoc IFX
+%nonassoc SENAO
+
+%left CMP %left CMP /* Menor precedência: compara depois de somar. Igual a C, Python e Java */
 %left MAIS MENOS
 %left VEZES DIV
 
-%type <a> expressao atribuicao comando declaracao comandos
+%type <a> expressao atribuicao comando declaracao comandos fluxo
 
 %%
 
 /* --- GRAMÁTICA --- */
 
-inicio: 
-    comandos
+inicio:
+    comandos { eval($1); }
     ;
 
 comandos:
@@ -106,19 +115,16 @@ comandos:
     | comandos comando { 
         if ($1 != NULL)
             $$ = newast('L', $1, $2);
-        else
+        else    
             $$ = $2;
-        
-        eval($2); 
     }
     ;
-
+    
 comando:
-    ESCREVA ABRE_P expressao FECHA_P PTVIRG { 
-        $$ = newast('P', $3, NULL); 
-    }
+    ESCREVA ABRE_P expressao FECHA_P PTVIRG { $$ = newast('P', $3, NULL); }
     | declaracao { $$ = $1; }
     | atribuicao { $$ = $1; }
+    | fluxo { $$ = $1; }
     ;
 
 declaracao:
@@ -133,6 +139,19 @@ atribuicao:
     }
     ;
 
+/* SE e ENQUANTO  */
+fluxo:
+    SE ABRE_P expressao FECHA_P ABRE_C comandos FECHA_C %prec IFX {
+        $$ = newflow('I', $3, $6, NULL); /* IF sem ELSE */
+    }
+    | SE ABRE_P expressao FECHA_P ABRE_C comandos FECHA_C SENAO ABRE_C comandos FECHA_C {
+        $$ = newflow('I', $3, $6, $10);  /* IF com ELSE */
+    }
+    | ENQUANTO ABRE_P expressao FECHA_P ABRE_C comandos FECHA_C {
+        $$ = newflow('W', $3, $6, NULL); /* WHILE */
+    }
+    ;
+
 expressao:
     NUM_INT             { $$ = newnum($1); }
     | NUM_FLOAT         { $$ = newnum($1); }
@@ -141,9 +160,7 @@ expressao:
     | expressao MENOS expressao { $$ = newast('-', $1, $3); }
     | expressao VEZES expressao { $$ = newast('*', $1, $3); }
     | expressao DIV expressao   { $$ = newast('/', $1, $3); }
-    
     | expressao CMP expressao   { $$ = newcmp($2, $1, $3); } 
-    
     | ABRE_P expressao FECHA_P  { $$ = $2; }
     ;
 
@@ -188,6 +205,17 @@ Ast *newcmp(int cmptype, Ast *l, Ast *r) {
     return a;
 }
 
+/* criar nós de fluxo  */
+Ast *newflow(int nodetype, Ast *cond, Ast *tl, Ast *el) {
+    Flow *a = (Flow*)malloc(sizeof(Flow));
+    if(!a) { printf("Sem memoria"); exit(0); }
+    a->nodetype = nodetype;
+    a->cond = cond;
+    a->tl = tl;
+    a->el = el;
+    return (Ast *)a;
+}
+
 double eval(Ast *a) {
     double v;
     VARI *aux;
@@ -221,14 +249,42 @@ double eval(Ast *a) {
         case '/': v = eval(a->l) / eval(a->r); break;
         
         /* Lógica de Comparação. "árv esq   >   árv dir" (Retorna 1.0 se True, 0.0 se False) */
-        case '1': v = (eval(a->l) > eval(a->r)) ? 1 : 0; break;  /* > */
-        case '2': v = (eval(a->l) < eval(a->r)) ? 1 : 0; break;  /* < */
-        case '3': v = (eval(a->l) != eval(a->r)) ? 1 : 0; break; /* != */
-        case '4': v = (eval(a->l) == eval(a->r)) ? 1 : 0; break; /* == */
-        case '5': v = (eval(a->l) >= eval(a->r)) ? 1 : 0; break; /* >= */
-        case '6': v = (eval(a->l) <= eval(a->r)) ? 1 : 0; break; /* <= */
+        case '1': v = (eval(a->l) > eval(a->r)) ? 1 : 0; break;
+        case '2': v = (eval(a->l) < eval(a->r)) ? 1 : 0; break;
+        case '3': v = (eval(a->l) != eval(a->r)) ? 1 : 0; break;
+        case '4': v = (eval(a->l) == eval(a->r)) ? 1 : 0; break;
+        case '5': v = (eval(a->l) >= eval(a->r)) ? 1 : 0; break;
+        case '6': v = (eval(a->l) <= eval(a->r)) ? 1 : 0; break;
 
-        case 'L': eval(a->l); v = eval(a->r); break;
+        /* Lógica do IF/ELSE*/
+        case 'I':
+            if (eval(((Flow *)a)->cond) != 0) { /* se condicao verdadeira */
+                if (((Flow *)a)->tl)
+                    v = eval(((Flow *)a)->tl);
+                else
+                    v = 0.0;
+            } else {
+                if (((Flow *)a)->el) {
+                    v = eval(((Flow *)a)->el);
+                } else
+                    v = 0.0;
+            }
+            break;
+
+        /* Lógica do WHILE */
+        case 'W':
+            v = 0.0;
+            if (((Flow *)a)->tl) {
+                while (eval(((Flow *)a)->cond) != 0) {
+                    v = eval(((Flow *)a)->tl);
+                }
+            }
+            break;
+
+        case 'L': 
+            eval(a->l); 
+            v = eval(a->r); 
+            break;
 
         case 'P': 
             v = eval(a->l);

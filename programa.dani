@@ -5,3 +5,17 @@ escreva(x);
 x = 10;
 escreva(x > 5);   
 escreva(x == 5);
+
+int i;
+i = 0;
+
+enquanto (i < 5) {
+    i = i + 1;
+    escreva(i);
+}
+
+se (i == 5) {
+    escreva(100);
+} senao {
+    escreva(0);
+}

@@ -2,13 +2,12 @@
 #include <stdio.h>
 %}
 
-
-DIGITO  [0-9]
-LETRA   [a-zA-Z]
-ESPACO  [ \t]
-QUEBRA  [\n]
+DIGITO   [0-9]
+LETRA    [a-zA-Z]
+ESPACO   [ \t]
+QUEBRA   [\n]
 VARIAVEL {LETRA}({LETRA}|{DIGITO})*
-FLOAT  {DIGITO}+\.{DIGITO}+
+FLOAT    {DIGITO}+\.{DIGITO}+
 STRING   \"[^\"]*\"
 COMENTARIO   "//".*
 %%
@@ -42,12 +41,24 @@ COMENTARIO   "//".*
 "<"         { return MENOR; }
 ">"         { return MAIOR; }
 
-{FLOAT}     { return NUM_FLOAT; }
-{DIGITO}+   { return NUM_INT; }
-{STRING}    { return LITERAL_STR; }
-{VARIAVEL}  { return VAR; }
+{FLOAT}     { 
+    yylval.flo = atof(yytext);
+    return NUM_FLOAT; 
+}
 
-.           { printf("Erro lexico: %s\n", yytext); }
+{DIGITO}+   { 
+    yylval.flo = atof(yytext);
+    return NUM_INT; 
+}
+
+{STRING}    { return LITERAL_STR; }
+
+{VARIAVEL}  { 
+    strcpy(yylval.str, yytext);
+    return VAR; 
+}
+
+.           { printf("Erro lexico: %s\n", yytext); } 
 
 %%
 

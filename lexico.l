@@ -1,5 +1,7 @@
 %{
 #include <stdio.h>
+#include <stdlib.h> 
+#include <string.h> 
 %}
 
 DIGITO   [0-9]
@@ -38,25 +40,18 @@ COMENTARIO   "//".*
 "{"         { return ABRE_C; }
 "}"         { return FECHA_C; }
 ","         { return VIRGULA; }
-"<"         { return MENOR; }
-">"         { return MAIOR; }
 
-{FLOAT}     { 
-    yylval.flo = atof(yytext);
-    return NUM_FLOAT; 
-}
+">"         { yylval.fn = 1; return CMP; }
+"<"         { yylval.fn = 2; return CMP; }
+"!="        { yylval.fn = 3; return CMP; }
+"=="        { yylval.fn = 4; return CMP; }
+">="        { yylval.fn = 5; return CMP; }
+"<="        { yylval.fn = 6; return CMP; }
 
-{DIGITO}+   { 
-    yylval.flo = atof(yytext);
-    return NUM_INT; 
-}
-
+{FLOAT}     { yylval.flo = atof(yytext); return NUM_FLOAT; }
+{DIGITO}+   { yylval.flo = atof(yytext); return NUM_INT; }
 {STRING}    { return LITERAL_STR; }
-
-{VARIAVEL}  { 
-    strcpy(yylval.str, yytext);
-    return VAR; 
-}
+{VARIAVEL}  { strcpy(yylval.str, yytext); return VAR; }
 
 .           { printf("Erro lexico: %s\n", yytext); } 
 

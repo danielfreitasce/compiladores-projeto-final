@@ -59,6 +59,7 @@ typedef struct varval { /* Nó para variáveis */
 Ast *newast(int nodetype, Ast *l, Ast *r);
 Ast *newnum(double d);
 Ast *newvar(char *s);
+Ast *newcmp(int cmptype, Ast *l, Ast *r);
 double eval(Ast *a);
 
 %}
@@ -66,6 +67,7 @@ double eval(Ast *a);
 /* --- UNION (Tipos de dados que transitam) --- */
 %union {
     double flo;
+    int fn;       /* NOVO: Para guardar o código da comparação (1, 2, 3...) */
     char str[50];
     Ast *a;
 }
@@ -77,14 +79,15 @@ double eval(Ast *a);
 %token SE SENAO ENQUANTO PARA
 %token PTVIRG VIRGULA
 %token ABRE_P FECHA_P ABRE_C FECHA_C
-%token MENOR MAIOR
 %token LITERAL_STR ATRIB
 
 /* Tokens com valor */
 %token <flo> NUM_INT NUM_FLOAT
 %token <str> VAR
+%token <fn> CMP  /*Token de comparação que carrega um inteiro */
 
 /* Precedência */
+%left CMP           /* Menor precedência: compara depois de somar. Igual a C, Python e Java */
 %left MAIS MENOS
 %left VEZES DIV
 
@@ -105,6 +108,7 @@ comandos:
             $$ = newast('L', $1, $2);
         else
             $$ = $2;
+        
         eval($2); 
     }
     ;
@@ -137,6 +141,9 @@ expressao:
     | expressao MENOS expressao { $$ = newast('-', $1, $3); }
     | expressao VEZES expressao { $$ = newast('*', $1, $3); }
     | expressao DIV expressao   { $$ = newast('/', $1, $3); }
+    
+    | expressao CMP expressao   { $$ = newcmp($2, $1, $3); } 
+    
     | ABRE_P expressao FECHA_P  { $$ = $2; }
     ;
 
@@ -167,6 +174,18 @@ Ast *newvar(char *s) {
     a->nodetype = 'N'; 
     strcpy(a->var, s);
     return (Ast*)a;
+}
+
+Ast *newcmp(int cmptype, Ast *l, Ast *r) {
+    Ast *a = (Ast*) malloc(sizeof(Ast));
+    if(!a) { printf("Sem memoria"); exit(0); }
+
+    /* Para não colidir com letras ASCII, somamos o tipo com '0'. Ex: Se cmptype for 1 (>), nodetype vira '1' */
+    /*Para pegar o tipe de teste, definido no arquivo.l e utilizar na função eval()*/
+    a->nodetype = '0' + cmptype; 
+    a->l = l;
+    a->r = r;
+    return a;
 }
 
 double eval(Ast *a) {
@@ -201,6 +220,14 @@ double eval(Ast *a) {
         case '*': v = eval(a->l) * eval(a->r); break;
         case '/': v = eval(a->l) / eval(a->r); break;
         
+        /* Lógica de Comparação. "árv esq   >   árv dir" (Retorna 1.0 se True, 0.0 se False) */
+        case '1': v = (eval(a->l) > eval(a->r)) ? 1 : 0; break;  /* > */
+        case '2': v = (eval(a->l) < eval(a->r)) ? 1 : 0; break;  /* < */
+        case '3': v = (eval(a->l) != eval(a->r)) ? 1 : 0; break; /* != */
+        case '4': v = (eval(a->l) == eval(a->r)) ? 1 : 0; break; /* == */
+        case '5': v = (eval(a->l) >= eval(a->r)) ? 1 : 0; break; /* >= */
+        case '6': v = (eval(a->l) <= eval(a->r)) ? 1 : 0; break; /* <= */
+
         case 'L': eval(a->l); v = eval(a->r); break;
 
         case 'P': 
